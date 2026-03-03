@@ -1,0 +1,15 @@
+# Secrets & session data
+config.json
+cookies.json
+
+# Runtime data
+rentals.db
+bot.log
+*.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
