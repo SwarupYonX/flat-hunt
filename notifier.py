@@ -15,9 +15,9 @@ CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
 with open(CONFIG_PATH) as f:
     CONFIG = json.load(f)
 
-TG = CONFIG["telegram"]
-BOT_TOKEN = TG["bot_token"]
-CHAT_ID = TG["chat_id"]
+TG = CONFIG.get("telegram", {})
+BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or TG.get("bot_token")
+CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID") or TG.get("chat_id")
 
 logger = logging.getLogger(__name__)
 

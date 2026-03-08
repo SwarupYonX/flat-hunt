@@ -1,21 +1,21 @@
 {
   "search": {
     "city": "Bengaluru",
-    "office": "JP Nagar 4th Phase, Dollars Colony",
-    "primary_area": "JP Nagar",
-    "primary_area_aliases": ["jp nagar", "j.p. nagar", "j p nagar", "jpnagar", "dollars colony", "sarakki"],
-    "secondary_areas": ["jayanagar", "btm layout", "btm 2nd stage", "btm 1st stage", "bilekahalli", "banashankari"],
+    "office": "Brookefield",
+    "primary_area": "Brookefield",
+    "primary_area_aliases": ["brookefield", "brookefield", "aecs layout", "beml layout", "kundalahalli", "graphite india"],
+    "secondary_areas": ["Kundalahalli gate", "whitefield", "doddanekundi", "thubarahalli", "munnekollal", "itpl", "chinnapannahalli"],
     "secondary_min_score": 55,
-    "reject_areas": ["akshayanagar", "gottigere", "hulimavu", "arekere", "electronic city", "whitefield", "marathahalli", "sarjapur", "hsr layout", "koramangala", "bommanahalli", "begur"],
+    "reject_areas": ["jp nagar", "jayanagar", "btm layout", "banashankari", "electronic city", "sarjapur", "hsr layout", "koramangala", "bommanahalli", "begur", "manyata", "hebbal"],
     "search_keywords": [
-      "2bhk rent jp nagar",
-      "1bhk rent jp nagar",
-      "flat for rent jp nagar",
-      "2bhk rent jayanagar",
-      "1bhk rent jayanagar",
-      "2bhk rent btm layout",
-      "1bhk rent btm layout",
-      "flat for rent btm layout bangalore"
+      "2bhk rent brookefield",
+      "1bhk rent brookefield",
+      "flat for rent brookefield",
+      "2bhk rent aecs layout",
+      "1bhk rent aecs layout",
+      "2bhk rent beml layout",
+      "1bhk rent beml layout",
+      "flat for rent aecs layout bangalore"
     ],
     "max_price_per_person": 16000,
     "max_price_2bhk": 32000,
@@ -37,14 +37,14 @@
       "1 bhk": 10
     },
     "area_points": {
-      "jp nagar": 20,
-      "j.p. nagar": 20,
-      "dollars colony": 20,
-      "sarakki": 18,
-      "jayanagar": 18,
-      "btm layout": 15,
-      "bilekahalli": 12,
-      "banashankari": 10
+      "brookefield": 20,
+      "aecs layout": 20,
+      "beml layout": 20,
+      "kundalahalli": 18,
+      "marathahalli": 15,
+      "whitefield": 15,
+      "doddanekundi": 12,
+      "munnekollal": 10
     },
     "positive_keywords": {
       "gated": 5,
