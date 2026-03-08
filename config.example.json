@@ -79,7 +79,8 @@
     "chat_id": "YOUR_CHAT_ID_HERE"
   },
   "groups": [
-    {"name": "Example Group", "url": "https://www.facebook.com/groups/example/"}
+    {"name": "Flatmate AECS LAYOUT WITHOUT BROKER", "url": "https://www.facebook.com/groups/383875823257227/"},
+    {"name": "Flats and Flatmates Bangalore", "url": "https://www.facebook.com/groups/838402552906457"}
   ],
   "scraper": {
     "headless": true,
