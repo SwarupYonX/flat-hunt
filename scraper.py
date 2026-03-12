@@ -222,11 +222,12 @@ def extract_listing_from_link(link_el) -> dict | None:
         return None
 
 
-def fetch_listing_detail(page, url: str) -> str:
+def fetch_listing_detail(page, url: str) -> dict:
     """
-    Visit the individual listing page and extract the full description + location.
-    Returns combined text string (may be empty on failure).
+    Visit the individual listing page and extract description + location.
+    Returns dict with 'description' and 'location' keys.
     """
+    result = {"description": "", "location": ""}
     try:
         page.goto(url, wait_until="domcontentloaded", timeout=20000)
         random_delay(2, 1)
@@ -256,30 +257,34 @@ def fetch_listing_detail(page, url: str) -> str:
                     desc_lines.append(lines[j])
                 desc = " ".join(desc_lines).strip()
                 break
+        result["description"] = desc
 
         # Extract location: FB detail pages show location in several places.
-        # Strategy 1: Look for a line with "Bengaluru" that also has a locality
-        # Strategy 2: Scan all lines for known area keywords
-        # Strategy 3: Look near "Listed X ago" for address
         full_address = ""
 
-        # Known areas to look for (both target and reject — we want to capture
-        # the area regardless so the scorer can judge it)
+        # Known areas to look for (both target and reject)
         all_areas = (
             SEARCH_CFG.get("primary_area_aliases", [])
             + SEARCH_CFG.get("secondary_areas", [])
             + SEARCH_CFG.get("reject_areas", [])
         )
 
-        # First pass: find any line containing a Bengaluru locality
+        # Scan all lines for any location-like text ("City, State" pattern)
         for line in lines[:50]:
             low = line.lower()
-            if "bengaluru" in low and len(line) > 14:
-                # This is likely a full address line like "JP Nagar 4th Phase, Bengaluru, KA"
+            # Match lines like "Nashik, MH" or "Brookefield, Bengaluru, KA"
+            if re.search(r",\s*[A-Z]{2}\s*$", line.strip()) and len(line) > 5:
                 full_address = line
                 break
 
-        # If generic "Bengaluru, KA", look for a better line with specific locality
+        # Try to find a more specific Bengaluru address
+        for line in lines[:50]:
+            low = line.lower()
+            if "bengaluru" in low and len(line) > 14:
+                full_address = line
+                break
+
+        # If generic "Bengaluru, KA", look for a line with specific locality
         if not full_address or full_address.lower().strip() in ("bengaluru, ka", "bengaluru, karnataka", "bengaluru"):
             for line in lines[:50]:
                 low = line.lower()
@@ -292,19 +297,18 @@ def fetch_listing_detail(page, url: str) -> str:
             for i, line in enumerate(lines):
                 if "listed" in line.lower() and "ago" in line.lower():
                     for j in range(i - 1, max(i - 6, 0), -1):
-                        if "bengaluru" in lines[j].lower() and len(lines[j]) > 8:
+                        if len(lines[j]) > 5 and re.search(r",\s*[A-Z]{2}\s*$", lines[j].strip()):
                             full_address = lines[j]
                             break
                     break
 
-        combined = " ".join(filter(None, [desc, full_address]))
-        return combined if len(combined) > 5 else ""
+        result["location"] = full_address
 
     except PlaywrightTimeout:
         logger.debug("Timeout fetching detail for %s", url)
     except Exception as e:
         logger.debug("Detail fetch error for %s: %s", url, e)
-    return ""
+    return result
 
 
 # ── Main scrape loop ────────────────────────────────────────────────────────
@@ -367,18 +371,39 @@ def scrape_keyword(page, keyword: str, dry_run: bool = False) -> tuple[int, int]
         seen_count += 1
         logger.info("New listing: %s | ₹%s | %s", listing["id"], listing.get("price"), listing.get("title", "")[:50])
 
-        # Do NOT auto-tag area from search keyword — FB search is not geo-filtered
-        # and returns listings from all over Bengaluru. Area points are only
-        # awarded if the listing's actual description/location mentions the area.
-
         # Always fetch the detail page — search cards only show "Bengaluru, KA"
-        # and the specific locality (JP Nagar etc.) is only on the detail page
+        # and the specific locality is only on the detail page
         price = listing.get("price")
         bhk = detect_bhk(listing.get("title", ""))
         max_allowed = SEARCH_CFG["max_price_2bhk"] if bhk == "2bhk" else SEARCH_CFG["max_price_1bhk"]
         if price is None or price <= max_allowed:
-            listing["description"] = fetch_listing_detail(page, listing["url"])
+            detail = fetch_listing_detail(page, listing["url"])
+            listing["description"] = detail["description"]
+            if detail["location"]:
+                listing["location"] = detail["location"]
+            logger.info("  Detail → location: %s | description: %s",
+                        listing.get('location', '')[:80] or '(none)',
+                        listing.get('description', '')[:120] or '(none)')
             random_delay(SCRAPER_CFG["delay_between_listings_sec"], 1)
+
+        # City-level filter: skip listings clearly outside Bengaluru/Karnataka
+        loc = listing.get("location", "").lower()
+        desc_text = listing.get("description", "").lower()
+        # Accept if location mentions Bengaluru/Karnataka or any of our target areas
+        valid_city_markers = ["bengaluru", "bangalore", ", ka", "karnataka"]
+        all_target_areas = (
+            SEARCH_CFG.get("primary_area_aliases", [])
+            + SEARCH_CFG.get("secondary_areas", [])
+        )
+        in_valid_city = (
+            any(m in loc for m in valid_city_markers)
+            or any(a.lower() in loc or a.lower() in desc_text for a in all_target_areas)
+            or not loc  # no location found — don't reject, let scorer decide
+        )
+        if not in_valid_city:
+            logger.info("  SKIPPED — not in Bengaluru (location: %s)", listing.get('location', '')[:60])
+            save_listing({**listing, "score": 0})
+            continue
 
         # Score the listing
         listing["score"] = score_listing(listing)
@@ -399,6 +424,15 @@ def scrape_keyword(page, keyword: str, dry_run: bool = False) -> tuple[int, int]
             else:
                 logger.info("[DRY RUN] Would send alert: %s", breakdown)
                 alerted_count += 1
+        elif listing["score"] >= CONFIG["scoring"]["alert_threshold"]:
+            # Score passed but should_alert() rejected — log why
+            text = " ".join([listing.get("title",""), listing.get("description",""), listing.get("location","")]).lower()
+            reject_areas = SEARCH_CFG.get("reject_areas", [])
+            in_rejected = any(a.lower() in text for a in reject_areas)
+            in_primary = any(a.lower() in text for a in SEARCH_CFG["primary_area_aliases"])
+            in_secondary = any(a.lower() in text for a in SEARCH_CFG["secondary_areas"])
+            logger.info("  SKIPPED (score OK but area check failed): rejected_area=%s, primary=%s, secondary=%s",
+                        in_rejected, in_primary, in_secondary)
 
     return seen_count, alerted_count
 
